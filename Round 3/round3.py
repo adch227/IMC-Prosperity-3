@@ -1,6 +1,7 @@
 import json
 from typing import Any, List, Dict
-
+from statistics import NormalDist
+import math
 from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
 
 
@@ -60,11 +61,14 @@ logger = Logger()
 RAINFOREST = "RAINFOREST_RESIN"
 KELP = "KELP"
 JAMS = "JAMS"
+VOLCANIC_ROCK = "VOLCANIC_ROCK"
+VOLCANIC_ROCK_VOUCHER_9500 = "VOLCANIC_ROCK_VOUCHER_9500"
 
 PRODUCTS = [
     RAINFOREST,
     KELP,
-    JAMS
+    JAMS,
+    VOLCANIC_ROCK
 ]
 
 class Trader:
@@ -73,6 +77,8 @@ class Trader:
             RAINFOREST: 50,
             KELP: 50,
             JAMS: 350,
+            VOLCANIC_ROCK: 400,
+            VOLCANIC_ROCK_VOUCHER_9500: 200,
             # Możesz dodać kolejne produkty tutaj
         }
         self.default_prices = {
@@ -91,21 +97,18 @@ class Trader:
 
         self.ema_param = 0.5
 
+        self.cdf = NormalDist().cdf
+
     
     def get_mid_price(self, product: str, state: TradingState):
-        order_depth = state.order_depths.get(product)
-        if not order_depth:
-            return self.default_prices[product]
+        order_depth = state.order_depths[product]
+        buy_orders = sorted(order_depth.buy_orders.items(), reverse=True)
+        sell_orders = sorted(order_depth.sell_orders.items())
 
-        bids = order_depth.buy_orders
-        asks = order_depth.sell_orders
+        popular_buy_price = max(buy_orders, key=lambda tup: tup[1])[0]
+        popular_sell_price = min(sell_orders, key=lambda tup: tup[1])[0]
 
-        if not bids or not asks:
-            return self.default_prices[product]
-
-        best_bid = max(bids.keys())
-        best_ask = min(asks.keys())
-        return (best_bid + best_ask) / 2
+        return (popular_buy_price + popular_sell_price) / 2
 
     def update_ema(self, product: str, state: TradingState):
         mid_price = self.get_mid_price(product, state)
@@ -131,16 +134,13 @@ class Trader:
         bid_volume = self.limits[product] - position
         ask_volume = -self.limits[product] - position
 
-        # Możesz tu dostosować poziom spreadu i agresję
-        
 
-        logger.print(f"KELP | EMA: {fair_price:.2f} | Pos: {position} | BID: {fair_price - spread} x {bid_volume}, ASK: {fair_price + spread} x {ask_volume}")
 
         return [
             Order(product, int(fair_price - spread), bid_volume),
             Order(product, int(fair_price + spread), ask_volume)
         ]
-    #Market making strategia
+
     def market_make(self, product: str, fair_price: int, spread: int, state: TradingState) -> List[Order]:
         position = self.get_position(product, state)
           # Spread 5 punktów
@@ -150,14 +150,28 @@ class Trader:
         bid = self.default_prices[product] - spread
         ask = self.default_prices[product] + spread
 
-        logger.print(f"{product} | Pos: {position} | BID: {bid} x {buy_volume}, ASK: {ask} x {sell_volume}")
-
         return [
             Order(product, bid, buy_volume),
             Order(product, ask, -sell_volume)
         ]
     
+    def black_scholes_strat(self, product: str, strike_price: int, state: TradingState) -> List[Order]:
 
+        def black_scholes_model(
+                self,
+                S: float,
+                K: float,
+                T: float,
+                r: float,
+                sigma: float,
+        ):
+            d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))
+            d2 = d1 - sigma * math.sqrt(T)
+
+            call_price = S * self.cdf(d1) - K * math.exp(-r * T) * self.cdf(d2)
+            return call_price
+            
+    
     def run(self, state: TradingState) -> tuple[Dict[Symbol, List[Order]], int, str]:
         result = {}
         conversions = 0
