@@ -72,6 +72,14 @@ PRODUCTS = [
     VOLCANIC_ROCK_VOUCHER_9500
 ]
 
+import json
+from typing import Any, List, Dict
+from statistics import NormalDist
+import math
+from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
+
+# ... [Logger definition and constants skipped for brevity]
+
 class Trader:
     def __init__(self):
         self.limits = {
@@ -87,35 +95,23 @@ class Trader:
             JAMS: 6600,
             VOLCANIC_ROCK: 10000,
             VOLCANIC_ROCK_VOUCHER_9500: 300
-
         }
-        self.past_prices = dict()
-        for product in PRODUCTS:
-            self.past_prices[product] = []
-        
-        self.ema_prices = dict()
-        for product in PRODUCTS:
-            self.ema_prices[product] = None
-
+        self.past_prices = {product: [] for product in PRODUCTS}
+        self.ema_prices = {product: None for product in PRODUCTS}
         self.ema_param = 0.5
-
         self.cdf = NormalDist().cdf
 
-    
     def get_mid_price(self, product: str, state: TradingState):
         order_depth = state.order_depths[product]
         buy_orders = sorted(order_depth.buy_orders.items(), reverse=True)
         sell_orders = sorted(order_depth.sell_orders.items())
-
         popular_buy_price = max(buy_orders, key=lambda tup: tup[1])[0]
         popular_sell_price = min(sell_orders, key=lambda tup: tup[1])[0]
-
         return (popular_buy_price + popular_sell_price) / 2
 
     def update_ema(self, product: str, state: TradingState):
         mid_price = self.get_mid_price(product, state)
         self.past_prices[product].append(mid_price)
-
         if self.ema_prices[product] is None:
             self.ema_prices[product] = mid_price
         else:
@@ -123,21 +119,15 @@ class Trader:
                 self.ema_param * mid_price + (1 - self.ema_param) * self.ema_prices[product]
             )
 
-
     def get_position(self, product: str, state: TradingState) -> int:
         return state.position.get(product, 0)
-
 
     def ema_strategy(self, product: str, spread: int, state: TradingState) -> List[Order]:
         self.update_ema(product, state)
         fair_price = self.ema_prices[product]
-
         position = self.get_position(product, state)
         bid_volume = self.limits[product] - position
         ask_volume = -self.limits[product] - position
-
-
-
         return [
             Order(product, int(fair_price - spread), bid_volume),
             Order(product, int(fair_price + spread), ask_volume)
@@ -145,64 +135,50 @@ class Trader:
 
     def market_make(self, product: str, fair_price: int, spread: int, state: TradingState) -> List[Order]:
         position = self.get_position(product, state)
-          # Spread 5 punktów
         buy_volume = max(0, self.limits[product] - position)
         sell_volume = max(0, self.limits[product] + position)
-
         bid = self.default_prices[product] - spread
         ask = self.default_prices[product] + spread
-
         return [
             Order(product, bid, buy_volume),
             Order(product, ask, -sell_volume)
         ]
-    
-    def black_scholes_strat(self, product: str, strike_price: int, state: TradingState) -> List[Order]:
 
-        def black_scholes_model(
-                self,
-                S: float,
-                K: float,
-                T: float,
-                r: float,
-                sigma: float,
-        ) -> float:
-            d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))
-            d2 = d1 - sigma * math.sqrt(T)
+    def black_scholes_model(self, S: float, K: float, T: float, r: float, sigma: float) -> float:
+        d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))
+        d2 = d1 - sigma * math.sqrt(T)
+        return S * self.cdf(d1) - K * math.exp(-r * T) * self.cdf(d2)
 
-            return S * self.cdf(d1) - K * math.exp(-r * T) * self.cdf(d2)
+    def black_scholes_strat(self, state: TradingState) -> List[Order]:
+        volcanic_r_price = self.get_mid_price(VOLCANIC_ROCK, state)
+        voucher_price = self.get_mid_price(VOLCANIC_ROCK_VOUCHER_9500, state)
 
-    volcanic_r_price = self.get_mid_price(state, VOLCANIC_ROCK)
-    voucher_price = self.get_mid_price(state, VOLCANIC_ROCK_VOUCHER_9500)
+        S = volcanic_r_price
+        K = 9500  # fixed strike price
+        T = 5 / 365
+        r = 0
+        sigma = 0.16
 
-    S = volcanic_r_price
-    K = strike_price
-    T = 5/365
-    r = 0
-    sigma = 0.16
+        expected_price = self.black_scholes_model(S, K, T, r, sigma)
+        spread = 2
 
-    spread = 2
-    
-    positio = self.get_position(VOLCANIC_ROCK_VOUCHER_9500, state)
-    volume = min(10, self.limit[VOLCANIC_ROCK_VOUCHER_9500] - abs(position))
-            
-     expected_price = self.black_scholes_model(S, K, T, r, sigma)
+        position = self.get_position(VOLCANIC_ROCK_VOUCHER_9500, state)
+        volume = min(10, self.limits[VOLCANIC_ROCK_VOUCHER_9500] - abs(position))
 
-     
-     if voucher_price > expected_price + 2:
-         return[orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price - spread), -volume))]
-     elif voucher_price < expected_price + 2:
-         return[orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price + spread), volume))]
+        orders = []
+        if voucher_price > expected_price + spread:
+            orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price - spread), -volume))
+        elif voucher_price < expected_price - spread:
+            orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price + spread), volume))
 
-    
+        return orders
+
     def run(self, state: TradingState) -> tuple[Dict[Symbol, List[Order]], int, str]:
         result = {}
         conversions = 0
         trader_data = ""
-
-        # Market making dla RAINFOREST_RESIN z fair price = 10000 i spreadem 5
         result[RAINFOREST] = self.market_make(RAINFOREST, fair_price=self.default_prices[RAINFOREST], spread=1, state=state)
         result[KELP] = self.ema_strategy(KELP, spread=1, state=state)
-
+        result[VOLCANIC_ROCK_VOUCHER_9500] = self.black_scholes_strat(state)
         logger.flush(state, result, conversions, trader_data)
         return result, conversions, trader_data
