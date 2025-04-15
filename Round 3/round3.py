@@ -68,7 +68,8 @@ PRODUCTS = [
     RAINFOREST,
     KELP,
     JAMS,
-    VOLCANIC_ROCK
+    VOLCANIC_ROCK,
+    VOLCANIC_ROCK_VOUCHER_9500
 ]
 
 class Trader:
@@ -79,12 +80,13 @@ class Trader:
             JAMS: 350,
             VOLCANIC_ROCK: 400,
             VOLCANIC_ROCK_VOUCHER_9500: 200,
-            # Możesz dodać kolejne produkty tutaj
         }
         self.default_prices = {
             RAINFOREST: 10000,
             KELP: 2030,
             JAMS: 6600,
+            VOLCANIC_ROCK: 10000,
+            VOLCANIC_ROCK_VOUCHER_9500: 300
 
         }
         self.past_prices = dict()
@@ -164,13 +166,34 @@ class Trader:
                 T: float,
                 r: float,
                 sigma: float,
-        ):
+        ) -> float:
             d1 = (math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * math.sqrt(T))
             d2 = d1 - sigma * math.sqrt(T)
 
-            call_price = S * self.cdf(d1) - K * math.exp(-r * T) * self.cdf(d2)
-            return call_price
+            return S * self.cdf(d1) - K * math.exp(-r * T) * self.cdf(d2)
+
+    volcanic_r_price = self.get_mid_price(state, VOLCANIC_ROCK)
+    voucher_price = self.get_mid_price(state, VOLCANIC_ROCK_VOUCHER_9500)
+
+    S = volcanic_r_price
+    K = strike_price
+    T = 5/365
+    r = 0
+    sigma = 0.16
+
+    spread = 2
+    
+    positio = self.get_position(VOLCANIC_ROCK_VOUCHER_9500, state)
+    volume = min(10, self.limit[VOLCANIC_ROCK_VOUCHER_9500] - abs(position))
             
+     expected_price = self.black_scholes_model(S, K, T, r, sigma)
+
+     
+     if voucher_price > expected_price + 2:
+         return[orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price - spread), -volume))]
+     elif voucher_price < expected_price + 2:
+         return[orders.append(Order(VOLCANIC_ROCK_VOUCHER_9500, int(voucher_price + spread), volume))]
+
     
     def run(self, state: TradingState) -> tuple[Dict[Symbol, List[Order]], int, str]:
         result = {}
