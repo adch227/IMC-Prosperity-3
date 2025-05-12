@@ -50,10 +50,38 @@ def market_make(self, product: str, fair_price: int, spread: int, state: Trading
 ### Kelp 
 
 Kelp was similar to Rainforest Resin, but major difference was that its price moved sligthly from one timestamp to another. Kelp didn't have fixed true price, like Rainforest Resin did but instead followed a slow version of a [random walk](https://www.investopedia.com/terms/r/randomwalktheory.asp). My strategy for this product was [Exponential Moving Average](https://www.investopedia.com/terms/e/ema.asp) with fixed alpha of 0,5. 
+```python
+ def update_ema(self, product: str, state: TradingState):
+        mid_price = self.get_mid_price(product, state)
+        self.past_prices[product].append(mid_price)
 
+        if self.ema_prices[product] is None:
+            self.ema_prices[product] = mid_price
+        else:
+            self.ema_prices[product] = (
+                self.ema_param * mid_price + (1 - self.ema_param) * self.ema_prices[product]
+            )
+
+def ema_strategy(self, product: str, spread: int, state: TradingState) -> List[Order]:
+        self.update_ema(product, state)
+        fair_price = self.ema_prices[product]
+
+        position = self.get_position(product, state)
+        bid_volume = self.limits[product] - position
+        ask_volume = -self.limits[product] - position
+        
+
+        logger.print(f"KELP | EMA: {fair_price:.2f} | Pos: {position} | BID: {fair_price - spread} x {bid_volume}, ASK: {fair_price + spread} x {ask_volume}")
+
+        return [
+            Order(product, int(fair_price - spread), bid_volume),
+            Order(product, int(fair_price + spread), ask_volume)
+```
 ## Round 2️⃣ 
 
 Three new invidiual prducts are introduced: Croissants, Jams and Djembes alongisde with two new baskets(ETF analog): PICNIC_BASKET1 (6x Croissants, 3x Jams, 1x Djembes) and PICNIC_BASKET2 (4x Croissants, 2x Jams). I didn't implement any strategy worth mentioning for these products. For anyone interested, I am suggesting to check great writing of [Frankfurt Hedgehog's](https://github.com/TimoDiehm/imc-prosperity-3) team that described their strategy for this round
+
+
 
 ## Round 3️⃣ 
 
