@@ -154,7 +154,7 @@ I've tried to do some research on Magnificent Macarons and variables that are in
 Round 5 didn't introduce any new products but instead it disclosed counterparty names you trade against. This Round  happened to be in an Easter Holidays time and it was pretty much the end for me in this competition. I wasn't able to work more on my algorithms and didn't even submit code this round due to workload and family obligations :) 
 
 
-# Summary 🏁
+# 🏁 Summary 
 
 This was my first encounter with algorithmic trading, and participating in IMC Prosperity 3 turned out to be a great learning experience. While I initially approached it from a programming perspective, I quickly found myself diving deep into the mechanics of trading — from pricing models and volatility to position management and market dynamics.
 
