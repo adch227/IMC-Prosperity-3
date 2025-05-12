@@ -164,7 +164,7 @@ Despite not having time to explore every edge, this project gave me:
 - A much better understanding of financial derivatives like options
 - Insights into how to test and evolve strategies round after round
 
-I walked away from the challenge with a deeper appreciation for algorithmic trading — and with the motivation to explore it even further in the future.
+I walk away from the challenge with a deeper appreciation for algorithmic trading and for sure will compete in it next year as it is great opportunity to learn during live competition, also for sure will look for team members as it really can be time consuming and it's hard for a person working full-time job and part-time Uni studies.
 
 
 
