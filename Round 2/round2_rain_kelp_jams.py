@@ -73,7 +73,7 @@ class Trader:
             RAINFOREST: 50,
             KELP: 50,
             JAMS: 350,
-            # Możesz dodać kolejne produkty tutaj
+            
         }
         self.default_prices = {
             RAINFOREST: 10000,
@@ -131,7 +131,6 @@ class Trader:
         bid_volume = self.limits[product] - position
         ask_volume = -self.limits[product] - position
 
-        # Możesz tu dostosować poziom spreadu i agresję
         
 
         logger.print(f"KELP | EMA: {fair_price:.2f} | Pos: {position} | BID: {fair_price - spread} x {bid_volume}, ASK: {fair_price + spread} x {ask_volume}")
@@ -140,10 +139,9 @@ class Trader:
             Order(product, int(fair_price - spread), bid_volume),
             Order(product, int(fair_price + spread), ask_volume)
         ]
-    #Market making strategia
     def market_make(self, product: str, fair_price: int, spread: int, state: TradingState) -> List[Order]:
         position = self.get_position(product, state)
-          # Spread 5 punktów
+        
         buy_volume = max(0, self.limits[product] - position)
         sell_volume = max(0, self.limits[product] + position)
 
